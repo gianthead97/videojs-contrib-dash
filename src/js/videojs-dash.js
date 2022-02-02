@@ -254,11 +254,77 @@ class Html5DashJS {
     // Setup text tracks
     setupTextTracks.call(null, this.player, tech, options);
 
+    this.setupQualityLevels_();
+
     // Attach the source with any protection data
     this.mediaPlayer_.setProtectionData(this.keySystemOptions_);
     this.mediaPlayer_.attachSource(manifestSource);
 
     this.tech_.triggerReady();
+  }
+
+  setupQualityLevels_() {
+    const player = this.player;
+
+    if (player && player.qualityLevels) {
+      this.qualityLevels_ = player.qualityLevels();
+      this.mediaPlayer_.on(dashjs.MediaPlayer.events.PLAYBACK_METADATA_LOADED, () => {
+        this.videoRates_ = this.mediaPlayer_.getBitrateInfoListFor('video');
+        this.audioRates_ = this.mediaPlayer_.getBitrateInfoListFor('audio');
+
+        const normalizeFactor = this.videoRates_[this.videoRates_.length - 1].bitrate;
+
+        this.audioMapper_ = this.videoRates_.map((rate) => {
+          return Math.round((rate.bitrate / normalizeFactor) * (this.audioRates_.length - 1));
+        });
+
+        this.videoRates_.forEach((vrate, index) => {
+          this.qualityLevels_.addQualityLevel({
+            id: vrate.bitrate,
+            width: vrate.width,
+            height: vrate.height,
+            bandwidth: vrate.bitrate,
+            enabled(val) {
+              if (val !== undefined) {
+                this.enabled__ = val;
+              } else {
+                return this.enabled__ !== undefined ? this.enabled__ : true;
+              }
+            }
+          });
+
+        });
+      });
+
+      this.qualityLevels_.on('change', event => {
+        const enabledQualities = this.qualityLevels_.levels_.filter(q => q.enabled);
+
+        if (enabledQualities.length === 1) {
+          if (this.mediaPlayer_.getAutoSwitchQualityFor('video')) {
+            this.mediaPlayer_.setAutoSwitchQualityFor('video', false);
+            this.mediaPlayer_.setAutoSwitchQualityFor('audio', false);
+          }
+          this.mediaPlayer_.setQualityFor('video', event.selectedIndex);
+          this.mediaPlayer_.setQualityFor('audio', this.audioMapper_[event.selectedIndex]);
+
+        } else if (!this.mediaPlayer_.getAutoSwitchQualityFor('video')) {
+          this.mediaPlayer_.setAutoSwitchQualityFor('video', true);
+          this.mediaPlayer_.setAutoSwitchQualityFor('audio', true);
+        }
+      });
+
+      this.mediaPlayer_.on(dashjs.MediaPlayer.events.QUALITY_CHANGE_REQUESTED, event => {
+        if (event.mediaType === 'video') {
+          this.qualityLevels_.selectedIndex_ = event.newQuality;
+          this.qualityLevels_.trigger({
+            selectedIndex: event.newQuality,
+            type: 'change'
+          });
+        }
+      });
+
+    }
+
   }
 
   /*
@@ -298,6 +364,10 @@ class Html5DashJS {
 
     if (this.player.dash) {
       delete this.player.dash;
+    }
+
+    if (this.qualityLevels_) {
+      this.qualityLevels_.dispose();
     }
 
     if (this.ttmlContainer_) {
