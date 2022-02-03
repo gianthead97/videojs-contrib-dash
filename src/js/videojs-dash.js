@@ -300,16 +300,16 @@ class Html5DashJS {
         const enabledQualities = this.qualityLevels_.levels_.filter(q => q.enabled);
 
         if (enabledQualities.length === 1) {
-          if (this.mediaPlayer_.getAutoSwitchQualityFor('video')) {
-            this.mediaPlayer_.setAutoSwitchQualityFor('video', false);
-            this.mediaPlayer_.setAutoSwitchQualityFor('audio', false);
+          if (this.mediaPlayer_.getSettings().streaming.abr.autoSwitchBitrate.video) {
+            this.mediaPlayer_.updateSettings({ streaming: { abr: { autoSwitchBitrate: { video: false }}}});
+            this.mediaPlayer_.updateSettings({ streaming: { abr: { autoSwitchBitrate: { audio: false }}}});
           }
           this.mediaPlayer_.setQualityFor('video', event.selectedIndex);
           this.mediaPlayer_.setQualityFor('audio', this.audioMapper_[event.selectedIndex]);
 
-        } else if (!this.mediaPlayer_.getAutoSwitchQualityFor('video')) {
-          this.mediaPlayer_.setAutoSwitchQualityFor('video', true);
-          this.mediaPlayer_.setAutoSwitchQualityFor('audio', true);
+        } else if (!this.mediaPlayer_.getSettings().streaming.abr.autoSwitchBitrate.video) {
+          this.mediaPlayer_.updateSettings({ streaming: { abr: { autoSwitchBitrate: { video: true }}}});
+          this.mediaPlayer_.updateSettings({ streaming: { abr: { autoSwitchBitrate: { audio: true }}}});
         }
       });
 
